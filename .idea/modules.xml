@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/.idea/talarian.iml" filepath="$PROJECT_DIR$/.idea/talarian.iml" />
+      <module fileurl="file://$PROJECT_DIR$/.idea/react-photo-slider.iml" filepath="$PROJECT_DIR$/.idea/react-photo-slider.iml" />
     </modules>
   </component>
 </project>
