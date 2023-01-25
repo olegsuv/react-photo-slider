@@ -1,5 +1,7 @@
 # Oleg - Frontend - Talarian's tech test
 
+Demo: https://olegsuv-react-photo-slider.netlify.app/
+
 ![demo.png](demo.png)
 
 # Getting Started with Create React App

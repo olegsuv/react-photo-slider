@@ -27,16 +27,116 @@ function PostSlider() {
   const [medias, setMedias] = useState(new Map());
   const [users, setUsers] = useState(new Map());
 
-  const updateMedias = useCallback((key: string, value: Media) => {
-    setMedias(new Map(medias.set(key, value)));
-  }, [medias]);
-  const updateUsers = useCallback((key: string, value: User) => {
-    setUsers(new Map(users.set(key, value)));
-  }, [users]);
-  const currentPost = posts?.[postNumber];
-  const currentImage = medias.get(currentPost?.mediaId);
-  const currentUser = users.get(currentPost?.user.username);
+  const updateMedias = useCallback(
+    (key: string, value: Media) => {
+      setMedias(new Map(medias.set(key, value)));
+    },
+    [medias]
+  );
+  const updateUsers = useCallback(
+    (key: string, value: User) => {
+      setUsers(new Map(users.set(key, value)));
+    },
+    [users]
+  );
 
+  const loadImage = (url: string) =>
+    new Promise((resolve, reject) => {
+      const img = new Image();
+      img.addEventListener("load", () => resolve(img));
+      img.addEventListener("error", (err) => reject(err));
+      img.src = url;
+    })
+      .then(() => {
+        return true;
+      })
+      .catch((err) => console.error(err));
+
+  const getNewMedia = async (newMediaId: string) => {
+    if (newMediaId && !medias.has(newMediaId)) {
+      //insert media json data into Map
+      const newMedia = await (() => fetchMedia(newMediaId))();
+      newMedia && updateMedias(newMediaId, newMedia);
+
+      //preload new media image
+      const newImageData = medias.get(newMediaId);
+      const newImageUrl = newImageData.urls.full;
+      await loadImage(newImageUrl);
+    }
+    return;
+  };
+
+  const getNewUser = async (newUsername: string) => {
+    if (newUsername && !users.has(newUsername)) {
+      //insert user json data into Map
+      const newUser = await (() => fetchUser(newUsername))();
+      newUser && updateUsers(newUsername, newUser);
+
+      //preload new user image
+      const newImageData = users.get(newUsername);
+      const newImageUrl = newImageData.profile_images.medium;
+      await loadImage(newImageUrl);
+    }
+    return;
+  };
+
+  const onTimeToChange = async () => {
+    //we need (for the first time only) media json + media image + user json + user image and then show
+    const postsAvailable = posts?.length || 0;
+    const isLastPost = postNumber >= postsAvailable - 1;
+    const getNewPostNumber = isLastPost ? 0 : postNumber + 1;
+    const newPost = posts?.[getNewPostNumber as any];
+    newPost && (await getNewMedia(newPost.mediaId));
+    newPost && (await getNewUser(newPost.user.username));
+    setPostNumber(getNewPostNumber);
+  };
+
+  const useInterval = useCallback(() => {
+    const interval = setTimeout(onTimeToChange, POSTS_INTERVAL);
+    return () => clearTimeout(interval);
+  }, [posts, postNumber]);
+
+  const fetchMedia = (mediaId: string) => {
+    const url = new URL(`${API_MEDIAS}/${mediaId}`);
+    const params = url.searchParams;
+    params.set("api_key", API_KEY);
+
+    return fetch(url.href)
+      .then((r) => r.json())
+      .then((data: MediaResponse) => {
+        const { media } = data.response;
+        return media;
+      })
+      .catch((error) => {
+        console.error(error);
+        setError(error);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  };
+
+  const fetchUser = (userName: string) => {
+    const url = new URL(`${API_USERS}/${userName}`);
+    const params = url.searchParams;
+    params.set("api_key", API_KEY);
+
+    return fetch(url.href)
+      .then((r) => r.json())
+      .then((data: UserResponse) => {
+        const { user } = data.response;
+        return user;
+      })
+      .catch((error) => {
+        console.error(error);
+        setError(error);
+      })
+      .finally(() => {
+        setLoading(false);
+      });
+  };
+
+  //going to fetch them once on mount and loop
   const fetchPosts = () => {
     const url = new URL(API_POSTS);
     const params = url.searchParams;
@@ -47,7 +147,10 @@ function PostSlider() {
 
     fetch(url.href)
       .then((r) => r.json())
-      .then((data: PostsResponse) => {
+      .then(async (data: PostsResponse) => {
+        const firstPost = data.response.posts[0];
+        await getNewMedia(firstPost.mediaId);
+        await getNewUser(firstPost.user.username);
         setPosts(data.response.posts);
       })
       .catch((error) => {
@@ -59,95 +162,24 @@ function PostSlider() {
       });
   };
 
-  const useInterval = useCallback(() => {
-    const interval = setTimeout(() => {
-      const postsAvailable = posts?.length || 0;
-      const isLastPost = postNumber >= postsAvailable - 1;
-      const getNewValue = (postNumber: number) =>
-        isLastPost ? 0 : postNumber + 1;
-      setPostNumber(getNewValue);
-    }, POSTS_INTERVAL);
-    return () => clearTimeout(interval);
-  }, [posts, postNumber]);
-
-  const getMedia = useCallback(
-    (mediaId: string) => {
-      const url = new URL(`${API_MEDIAS}/${mediaId}`);
-      const params = url.searchParams;
-      params.set("api_key", API_KEY);
-
-      fetch(url.href)
-        .then((r) => r.json())
-        .then((data: MediaResponse) => {
-          const { media } = data.response;
-          updateMedias(mediaId, media);
-        })
-        .catch((error) => {
-          console.error(error);
-          setError(error);
-        })
-        .finally(() => {
-          setLoading(false);
-        });
-    },
-    [updateMedias]
-  );
-
-  const getUser = useCallback(
-    (userName: string) => {
-      const url = new URL(`${API_USERS}/${userName}`);
-      const params = url.searchParams;
-      params.set("api_key", API_KEY);
-
-      fetch(url.href)
-        .then((r) => r.json())
-        .then((data: UserResponse) => {
-          const { user } = data.response;
-          updateUsers(userName, user);
-        })
-        .catch((error) => {
-          console.error(error);
-          setError(error);
-        })
-        .finally(() => {
-          setLoading(false);
-        });
-    },
-    [updateUsers]
-  );
-
-  const checkMedia = useCallback(() => {
-    const mediaId = currentPost?.mediaId;
-    if (mediaId && !medias.has(mediaId)) {
-      getMedia(mediaId);
-    }
-  }, [currentPost?.mediaId, getMedia, medias]);
-
-  const checkUser = useCallback(() => {
-    const userName = currentPost?.user.username;
-    if (userName && !users.has(userName)) {
-      getUser(userName);
-    }
-  }, [currentPost?.user.username, getUser, users]);
-
   useEffect(fetchPosts, []);
 
   useEffect(useInterval, [useInterval]);
 
-  useEffect(checkMedia, [checkMedia]);
-
-  useEffect(checkUser, [checkUser]);
-
+  const currentPost = posts?.[postNumber];
+  const currentImage = medias.get(currentPost?.mediaId);
+  const currentUser = users.get(currentPost?.user.username);
   return (
     <div className="post-slider">
       {loading && <div className="loading">Loading...</div>}
       {error && <div className="error">Error: {error}</div>}
       {currentPost && (
         <div className="post-item">
-          <div
-            className="post-image-holder"
-            style={{ backgroundImage: `url(${currentImage?.urls.full})` }}
-          >
+          <div className="post-image-holder">
+            <div
+              className="post-image-blur"
+              style={{ backgroundImage: `url(${currentImage?.urls.full})` }}
+            ></div>
             <img
               className="post-image"
               src={currentImage?.urls.full}

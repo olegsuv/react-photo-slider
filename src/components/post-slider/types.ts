@@ -64,10 +64,5 @@ export interface MediaResponse {
   success: boolean;
   response: {
     media: Media;
-    __trace: {
-      mediaId: string;
-      requestId: string;
-      requestTook: number;
-    };
   };
 }
