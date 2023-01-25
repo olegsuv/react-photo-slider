@@ -1,3 +1,4 @@
+/* eslint-disable react-hooks/exhaustive-deps */
 import React, { useCallback, useEffect, useState } from "react";
 import "./styles.css";
 import LikeIcon from "../../images/facebook.svg";
@@ -27,6 +28,7 @@ function PostSlider() {
   const [medias, setMedias] = useState(new Map());
   const [users, setUsers] = useState(new Map());
 
+  //storing json data for media and users as Map objects
   const updateMedias = useCallback(
     (key: string, value: Media) => {
       setMedias(new Map(medias.set(key, value)));
@@ -40,6 +42,7 @@ function PostSlider() {
     [users]
   );
 
+  //preloading image as Promise
   const loadImage = (url: string) =>
     new Promise((resolve, reject) => {
       const img = new Image();
@@ -52,6 +55,7 @@ function PostSlider() {
       })
       .catch((err) => console.error(err));
 
+  //checking current map and request new json + image in case for media
   const getNewMedia = async (newMediaId: string) => {
     if (newMediaId && !medias.has(newMediaId)) {
       //insert media json data into Map
@@ -66,6 +70,7 @@ function PostSlider() {
     return;
   };
 
+  //checking current map and request new json + image in case for user
   const getNewUser = async (newUsername: string) => {
     if (newUsername && !users.has(newUsername)) {
       //insert user json data into Map
@@ -80,22 +85,24 @@ function PostSlider() {
     return;
   };
 
+  //we need (for the first time only) media json + media image + user json + user image and then show
   const onTimeToChange = async () => {
-    //we need (for the first time only) media json + media image + user json + user image and then show
     const postsAvailable = posts?.length || 0;
     const isLastPost = postNumber >= postsAvailable - 1;
     const getNewPostNumber = isLastPost ? 0 : postNumber + 1;
-    const newPost = posts?.[getNewPostNumber as any];
+    const newPost = posts?.[getNewPostNumber];
     newPost && (await getNewMedia(newPost.mediaId));
     newPost && (await getNewUser(newPost.user.username));
     setPostNumber(getNewPostNumber);
   };
 
-  const useInterval = useCallback(() => {
-    const interval = setTimeout(onTimeToChange, POSTS_INTERVAL);
-    return () => clearTimeout(interval);
-  }, [posts, postNumber]);
+  //timeout here as set time is a minimal view of slide, then loading jsons/images happening, then show of next slide
+  const useTimeout = () => {
+    const timeout = setTimeout(onTimeToChange, POSTS_INTERVAL);
+    return () => clearTimeout(timeout);
+  };
 
+  //fetch Media json for post
   const fetchMedia = (mediaId: string) => {
     const url = new URL(`${API_MEDIAS}/${mediaId}`);
     const params = url.searchParams;
@@ -116,6 +123,7 @@ function PostSlider() {
       });
   };
 
+  //fetch User json for post
   const fetchUser = (userName: string) => {
     const url = new URL(`${API_USERS}/${userName}`);
     const params = url.searchParams;
@@ -164,7 +172,7 @@ function PostSlider() {
 
   useEffect(fetchPosts, []);
 
-  useEffect(useInterval, [useInterval]);
+  useEffect(useTimeout, [posts, postNumber]);
 
   const currentPost = posts?.[postNumber];
   const currentImage = medias.get(currentPost?.mediaId);
